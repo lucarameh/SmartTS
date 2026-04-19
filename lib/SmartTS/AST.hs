@@ -74,6 +74,7 @@ data Stmt = AssignmentStmt LValue Expr
           | WhileStmt Expr Stmt               -- (condition, body)  
           | ReturnStmt Expr
           | SequenceStmt [Stmt]
+          | ForLoop Name Type Expr Expr Stmt Stmt
   deriving (Eq, Show)
 
 findMethods :: MethodKind -> Contract -> [MethodDecl]
