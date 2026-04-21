@@ -98,6 +98,13 @@ checkStmt env (WhileStmt cond body) = do
   expectType "while condition" tc TBool
   void (checkStmt env body)
   return env
+checkStmt env (ForStmt initial cond update body) = do
+  envWithInit <- checkSimpleStmt env initial
+  tc <- inferExpr envWithInit cond
+  expectType "for condition" tc TBool
+  void (checkSimpleStmt envWithInit update)
+  void (checkStmt envWithInit body)
+  return env
 
 noDuplicateLocal :: Name -> TcEnv -> Either String ()
 noDuplicateLocal n env =
@@ -126,6 +133,26 @@ checkAssignable env lv =
           Left $ "Cannot assign to immutable val `" ++ n ++ "` (or through it for field updates)."
         Just (TcBinding LocalMutable _) -> Right ()
     LField {} -> Right ()
+
+checkSimpleStmt :: TcEnv -> SimpleStmt -> Either String TcEnv
+checkSimpleStmt env (SVarDeclStmt n typ e) = do
+  noDuplicateLocal n env
+  t <- inferExpr env e
+  expectType ("initializer of var `" ++ n ++ "`") t typ
+  return $ insertLocal n LocalMutable typ env
+
+checkSimpleStmt env (SValDeclStmt n typ e) = do
+  noDuplicateLocal n env
+  t <- inferExpr env e
+  expectType ("initializer of val `" ++ n ++ "`") t typ
+  return $ insertLocal n LocalImmutable typ env
+
+checkSimpleStmt env (SAssignmentStmt lv e) = do
+  checkAssignable env lv
+  tl <- typeOfLValue env lv
+  te <- inferExpr env e
+  expectType "assignment" te tl
+  return env
 
 rootOf :: LValue -> LValue
 rootOf LStorage = LStorage

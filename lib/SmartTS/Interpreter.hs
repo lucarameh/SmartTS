@@ -290,6 +290,37 @@ execStmt rt (WhileStmt cond body) = loop rt
             Just v -> Right (Just v, next)
             Nothing -> loop next
         _ -> interpretBug "while condition was not bool after type check"
+execStmt rt (ForStmt initial cond update body) = do
+    (_, rtWithInit) <- execSimpleStmt rt initial
+    let loop cur = do
+          c <- evalExpr cur cond
+          case c of
+            CBool False -> Right (Nothing, cur)
+            CBool True -> do
+                (ret, rtAfterBody) <- execStmt cur body
+                case ret of
+                    Just v -> Right (Just v, rtAfterBody) 
+                    Nothing -> do
+                        (_, rtAfterUpdate) <- execSimpleStmt rtAfterBody update
+                        loop rtAfterUpdate
+            _ -> interpretBug "for condition was not bool after type check"
+    loop rtWithInit
+
+execSimpleStmt :: Runtime -> SimpleStmt -> Either String (Maybe Expr, Runtime)
+execSimpleStmt rt (SVarDeclStmt n _ e) = do
+    v <- evalExpr rt e
+    let locals' = M.insert n (Binding True v) (rtLocals rt)
+    Right (Nothing, rt {rtLocals = locals'})
+
+execSimpleStmt rt (SValDeclStmt n _ e) = do
+    v <- evalExpr rt e
+    let locals' = M.insert n (Binding False v) (rtLocals rt)
+    Right (Nothing, rt {rtLocals = locals'})
+
+execSimpleStmt rt (SAssignmentStmt lv e) = do
+    v <- evalExpr rt e
+    rt' <- assignLValue rt lv v
+    Right (Nothing, rt')
 
 execSequence :: Runtime -> [Stmt] -> Either String (Maybe Expr, Runtime)
 execSequence rt [] = Right (Nothing, rt)
