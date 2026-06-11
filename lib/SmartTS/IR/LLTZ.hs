@@ -98,10 +98,7 @@ data Constant
 -- | Built-in operations.  Constructors are prefixed with 'Prim' to avoid
 -- clashes with Haskell prelude names (Left, Right, Not, …).
 data Primitive
-  = PrimAmount
-  | PrimBalance
-  | PrimChainId
-  | PrimEmptyMap    Type Type
+  = PrimEmptyMap    Type Type
   | PrimEmptySet    Type
   | PrimNil         Type
   | PrimNone        Type
@@ -168,14 +165,14 @@ data Expr = Expr
   } deriving (Eq, Show)
 
 data ExprDesc
-  = Variable    Var
+  = Const       Constant
+  | Variable    Var
   | LetIn       Var Expr Expr
+  | LetMutIn    MutVar Expr Expr
   | Lambda      LambdaBinder
   | LambdaRec   Binder LambdaBinder
   | App         Expr Expr
-  | Const       Constant
   | Prim        Primitive [Expr]
-  | LetMutIn    MutVar Expr Expr
   | Deref       MutVar
   | Assign      MutVar Expr
   | IfBool      Expr Expr Expr
@@ -195,4 +192,5 @@ data ExprDesc
   | UpdateTuple Expr RowPath Expr
   | Inj         (RowContext Type) Expr
   | Match       Expr (Row LambdaBinder)
+  | Skip        -- LLTZ extension. Do nothing!!!
   deriving (Eq, Show)
