@@ -63,13 +63,19 @@ library
     -- Modules exported by the library.
     exposed-modules:
         MyLib
-      ,         SmartTS.AST
+      , SmartTS.IR.AST
+      , SmartTS.IR.LLTZ
       , SmartTS.Parser
       , SmartTS.Interpreter
       , SmartTS.TypeCheck
+      , SmartTS.CodeGen.CompileLLTZ
 
     -- Modules included in this library but not exported.
-    -- other-modules:
+    other-modules:
+        SmartTS.Interpreter.Runtime
+      , SmartTS.Interpreter.Codec
+      , SmartTS.Interpreter.Eval
+      , SmartTS.Interpreter.Contract
 
     -- LANGUAGE extensions used by modules in this package.
     other-extensions:     StrictData
