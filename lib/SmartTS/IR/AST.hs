@@ -95,7 +95,7 @@ data LValue
   deriving (Eq, Show)
 
 data SimpleStmt a
-  = SAssignment LValue (Expr a)
+  = SAssignmentStmt LValue (Expr a)
   | SVarDeclStmt Name Type (Expr a)       -- (mutable)
   | SValDeclStmt Name Type (Expr a)       -- (immutable)
   deriving (Eq, Show)

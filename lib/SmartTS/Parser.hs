@@ -180,11 +180,11 @@ parseStmt =
     <|> parseAssignment
     <|> parseBlock
 
-parseSimpleStmt :: Parser SimpleStmt
+parseSimpleStmt :: Parser (SimpleStmt ())
 parseSimpleStmt = 
   parseSVarDeclStmt
     <|> parseSValDeclStmt
-    <|> parseSAssignment
+    <|> parseSAssignmentStmt
 
 parseVarDeclStmt :: Parser ParsedStmt
 parseVarDeclStmt = do
@@ -208,7 +208,7 @@ parseValDeclStmt = do
   _ <- symbol ";"
   return $ ValDeclStmt name typ expr
 
-parseSVarDeclStmt :: Parser SimpleStmt
+parseSVarDeclStmt :: Parser (SimpleStmt ())
 parseSVarDeclStmt = do
   _ <- reserved "var"
   name <- parseName
@@ -218,7 +218,7 @@ parseSVarDeclStmt = do
   expr <- parseExpr
   return $ SVarDeclStmt name typ expr
 
-parseSValDeclStmt :: Parser SimpleStmt
+parseSValDeclStmt :: Parser (SimpleStmt ())
 parseSValDeclStmt = do
   _ <- reserved "val"
   name <- parseName
@@ -238,7 +238,7 @@ parseIfStmt = do
     parseStmt
   return $ IfStmt cond thenBranch elseBranch
 
-parseForStmt :: Parser Stmt
+parseForStmt :: Parser (Stmt ())
 parseForStmt = do
   _ <- reserved "for"
   _ <- symbol "("
@@ -267,8 +267,8 @@ parseAssignment = do
   _ <- symbol ";"
   return $ AssignmentStmt target expr
 
-parseSAssignment :: Parser SimpleStmt
-parseSAssignment = do
+parseSAssignmentStmt :: Parser (SimpleStmt ())
+parseSAssignmentStmt = do
   target <- parseLValue
   _ <- symbol "="
   expr <- parseExpr
