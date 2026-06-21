@@ -109,6 +109,42 @@ execStmt (IfStmt cond thenS elseS) = do
         Nothing -> return Nothing
         Just es -> execStmt es
     _ -> interpretBug "if condition was not bool after type check"
+execStmt (ForStmt sinit cond updt body) = do
+  -- Execute initializer (simple stmt)
+  case sinit of
+    SAssignmentStmt lv e -> do
+      v <- evalExpr e
+      assignLValue lv v
+    SVarDeclStmt n _ e -> do
+      v <- evalExpr e
+      modify $ \rt -> rt {rtLocals = M.insert n (Binding True v) (rtLocals rt)}
+    SValDeclStmt n _ e -> do
+      v <- evalExpr e
+      modify $ \rt -> rt {rtLocals = M.insert n (Binding False v) (rtLocals rt)}
+  -- Loop
+  let loop = do
+        c <- evalExpr cond
+        case c of
+          CBool _ False -> return Nothing
+          CBool _ True  -> do
+            ret <- execStmt body
+            case ret of
+              Just v  -> return (Just v)
+              Nothing -> do
+                -- execute update (simple stmt)
+                case updt of
+                  SAssignmentStmt lv e -> do
+                    v <- evalExpr e
+                    assignLValue lv v
+                  SVarDeclStmt n _ e -> do
+                    v <- evalExpr e
+                    modify $ \rt -> rt {rtLocals = M.insert n (Binding True v) (rtLocals rt)}
+                  SValDeclStmt n _ e -> do
+                    v <- evalExpr e
+                    modify $ \rt -> rt {rtLocals = M.insert n (Binding False v) (rtLocals rt)}
+                loop
+          _ -> interpretBug "for condition was not bool after type check"
+  loop
 execStmt (WhileStmt cond body) = loop
   where
     loop = do

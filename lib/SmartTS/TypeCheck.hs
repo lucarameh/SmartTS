@@ -162,15 +162,13 @@ checkStmt (IfStmt cond thn mel) = do
     Just els -> Just <$> withSavedEnv (checkStmt els)
   return (IfStmt tc tthn tmel)
 checkStmt (ForStmt sinit cond updt body) = do
-  -- The loop-initializer introduces a variable that should be visible
-  -- in the condition, update and body, but must not escape after the loop.
-  saved <- get
+  saved <- get -- salva proprio escopo forloop
   tinit <- checkSimpleStmt sinit
   tc <- inferExpr cond
   lift $ expectType "for loop condition" (exprAnn tc) TBool
   tincr <- checkSimpleStmt updt
   tbody <- checkStmt body
-  put saved
+  put saved -- restaura escopo antes do forloop
   return (ForStmt tinit tc tincr tbody)
 checkStmt (WhileStmt cond body) = do
   tc <- inferExpr cond
