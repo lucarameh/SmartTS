@@ -434,6 +434,18 @@ statementTests = testGroup "Statement Parsing"
             ] ->
               return ()
           _ -> assertFailure $ "Expected local record field assignment, got: " ++ show contract
+  , testCase "For statement" $
+      parseSuccess "contract Test { storage: { x: int }; @entrypoint f(): int { for (var i: int = 0; i < 1; i = i + 1) { x = x + 1; } return x; } }" $ \contract ->
+        case contract of
+          Contract _ _
+            [ MethodDecl _ "f" [] TInt
+                (SequenceStmt
+                  [ ForStmt (SVarDeclStmt "i" TInt (CInt _ 0)) (Lt _ (Var _ "i") (CInt _ 1)) (SAssignmentStmt (LVar "i") (Add _ (Var _ "i") (CInt _ 1))) (SequenceStmt [AssignmentStmt (LVar "x") (Add _ (Var _ "x") (CInt _ 1))])
+                  , ReturnStmt (Var _ "x")
+                  ])
+            ] ->
+              return ()
+          _ -> assertFailure $ "Expected for statement, got: " ++ show contract
   ]
 
 typeCheckTests :: TestTree
@@ -443,6 +455,9 @@ typeCheckTests =
     [ testCase "Minimal well-typed contract" $
         typeCheckSuccess
           "contract C { storage: { x: int }; @originate init(): int { return 0; } }"
+    , testCase "For loop type checks" $
+        typeCheckSuccess
+          "contract C { storage: { x: int }; @originate init(): int { storage.x = 0; return 0; } @entrypoint inc(): int { for (var i: int = 0; i < 3; i = i + 1) { storage.x = storage.x + 1; } return storage.x; } }"
     , testCase "Return type mismatch" $
         typeCheckFailure
           "contract C { storage: { x: int }; @originate init(): int { return true; } }"
@@ -458,6 +473,15 @@ typeCheckTests =
     , testCase "If condition must be bool" $
         typeCheckFailure
           "contract C { storage: { x: int }; @originate init(): int { if (1) { return 0; } else { return 1; } } }"
+    , testCase "For condition must be bool" $
+        typeCheckFailure
+          "contract C { storage: { x: int }; @originate init(): int { storage.x = 0; return 0; } @entrypoint bad(): int { for (var i: int = 0; i + 1; i = i + 1) { storage.x = storage.x + 1; } return storage.x; } }"
+    , testCase "Loop variable not visible after loop" $
+        typeCheckFailure
+          "contract C { storage: { x: int }; @originate init(): int { storage.x = 0; return 0; } @entrypoint outscope(): int { for (var i: int = 0; i < 1; i = i + 1) { storage.x = storage.x + 1; } return i; } }"
+    , testCase "Shadowing loop init fails" $
+        typeCheckFailure
+          "contract C { storage: { x: int }; @originate init(): int { storage.x = 0; return 0; } @entrypoint shadow(): int { var y: int = 10; for (var y: int = 0; y < 1; y = y + 1) { storage.x = storage.x + 1; } return y; } }"
     , testCase "Storage field assignment matches storage type" $
         typeCheckSuccess
           "contract C { storage: { n: int }; @originate init(): unit { storage.n = 3; return (); } }"
