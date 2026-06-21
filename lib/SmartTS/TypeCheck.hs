@@ -107,6 +107,26 @@ checkMethod c m =
           , methodBody       = typedBody
           }
 
+checkSimpleStmt :: SimpleStmt () -> TcM (SimpleStmt Type)
+checkSimpleStmt (SAssignmentStmt lv e) = do
+  checkAssignable lv
+  tl <- typeOfLValue lv
+  te <- inferExpr e
+  lift $ expectType "assignment" (exprAnn te) tl
+  return (SAssignmentStmt lv te)
+checkSimpleStmt (SVarDeclStmt n typ e) = do
+  noDuplicateLocal n
+  te <- inferExpr e
+  lift $ expectType ("initializer of var `" ++ n ++ "`") (exprAnn te) typ
+  modify $ insertLocal n LocalMutable typ
+  return (SVarDeclStmt n typ te)
+checkSimpleStmt (SValDeclStmt n typ e) = do
+  noDuplicateLocal n
+  te <- inferExpr e
+  lift $ expectType ("initializer of val `" ++ n ++ "`") (exprAnn te) typ
+  modify $ insertLocal n LocalImmutable typ
+  return (SValDeclStmt n typ te)
+
 -- | Check a statement and return the type-annotated version.
 checkStmt :: Stmt () -> TcM (Stmt Type)
 checkStmt (SequenceStmt ss) = SequenceStmt <$> mapM checkStmt ss
@@ -141,6 +161,17 @@ checkStmt (IfStmt cond thn mel) = do
     Nothing  -> return Nothing
     Just els -> Just <$> withSavedEnv (checkStmt els)
   return (IfStmt tc tthn tmel)
+checkStmt (ForStmt sinit cond updt body) = do
+  -- The loop-initializer introduces a variable that should be visible
+  -- in the condition, update and body, but must not escape after the loop.
+  saved <- get
+  tinit <- checkSimpleStmt sinit
+  tc <- inferExpr cond
+  lift $ expectType "for loop condition" (exprAnn tc) TBool
+  tincr <- checkSimpleStmt updt
+  tbody <- checkStmt body
+  put saved
+  return (ForStmt tinit tc tincr tbody)
 checkStmt (WhileStmt cond body) = do
   tc <- inferExpr cond
   lift $ expectType "while condition" (exprAnn tc) TBool
