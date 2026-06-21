@@ -127,6 +127,12 @@ checkSimpleStmt (SValDeclStmt n typ e) = do
   modify $ insertLocal n LocalImmutable typ
   return (SValDeclStmt n typ te)
 
+-- converte simpleStmt em Stmt
+simpleToStmt :: SimpleStmt Type -> Stmt Type
+simpleToStmt (SAssignmentStmt lv e) = AssignmentStmt lv e
+simpleToStmt (SVarDeclStmt n typ e) = VarDeclStmt n typ e
+simpleToStmt (SValDeclStmt n typ e) = ValDeclStmt n typ e
+
 -- | Check a statement and return the type-annotated version.
 checkStmt :: Stmt () -> TcM (Stmt Type)
 checkStmt (SequenceStmt ss) = SequenceStmt <$> mapM checkStmt ss
@@ -169,7 +175,11 @@ checkStmt (ForStmt sinit cond updt body) = do
   tincr <- checkSimpleStmt updt
   tbody <- checkStmt body
   put saved -- restaura escopo antes do forloop
-  return (ForStmt tinit tc tincr tbody)
+  -- Executa o forloop como while: sinit; while cond { body; updt }
+  return $ SequenceStmt 
+    [ simpleToStmt tinit
+    , WhileStmt tc (SequenceStmt [tbody, simpleToStmt tincr])
+    ]
 checkStmt (WhileStmt cond body) = do
   tc <- inferExpr cond
   lift $ expectType "while condition" (exprAnn tc) TBool
