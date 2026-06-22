@@ -1,7 +1,9 @@
+{-# OPTIONS_GHC -Wno-incomplete-patterns #-}
 module SmartTS.CodeGen.CompileLLTZ where
 
 import qualified SmartTS.IR.AST as A
 import qualified SmartTS.IR.LLTZ as L
+import SmartTS.IR.LLTZ (Expr(exprDesc))
 
 translateType :: A.Type -> L.Type
 translateType A.TInt             = L.TInt
@@ -67,6 +69,13 @@ translateStatement (A.IfStmt cond s1 Nothing) =
   let cond' = translateExpression cond
       s1'   = translateStatement s1
   in L.Expr (L.IfBool cond' s1' (L.Expr L.Skip L.TUnit)) (L.exprType s1')
+--falta definir a MutVar
+translateStatement (A.ForStmt init cond inc block) =
+  let init' = translateStatement init
+      cond' = translateExpression cond
+      inc' = translateStatement inc
+      block' = translateBlock block
+  in L.Expr exprDesc=(L.ForStmt init' cond' inc' block') exprType=L.TUnit
 -- Translate the while statement.
 -- The result type is TUnit because Michelson's LOOP instruction does not produce
 -- a value: when the loop exits the stack is in the same state as before the
