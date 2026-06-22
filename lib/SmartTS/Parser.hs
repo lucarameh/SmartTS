@@ -180,7 +180,7 @@ parseStmt =
     <|> parseAssignment
     <|> parseBlock
 
-parseSimpleStmt :: Parser (SimpleStmt ())
+parseSimpleStmt :: Parser ParsedStmt
 parseSimpleStmt = 
   parseSVarDeclStmt
     <|> parseSValDeclStmt
@@ -208,7 +208,7 @@ parseValDeclStmt = do
   _ <- symbol ";"
   return $ ValDeclStmt name typ expr
 
-parseSVarDeclStmt :: Parser (SimpleStmt ())
+parseSVarDeclStmt :: Parser ParsedStmt
 parseSVarDeclStmt = do
   _ <- reserved "var"
   name <- parseName
@@ -216,9 +216,9 @@ parseSVarDeclStmt = do
   typ <- parseType
   _ <- symbol "="
   expr <- parseExpr
-  return $ SVarDeclStmt name typ expr
+  return $ VarDeclStmt name typ expr
 
-parseSValDeclStmt :: Parser (SimpleStmt ())
+parseSValDeclStmt :: Parser ParsedStmt
 parseSValDeclStmt = do
   _ <- reserved "val"
   name <- parseName
@@ -226,7 +226,7 @@ parseSValDeclStmt = do
   typ <- parseType
   _ <- symbol "="
   expr <- parseExpr
-  return $ SValDeclStmt name typ expr
+  return $ ValDeclStmt name typ expr
 
 parseIfStmt :: Parser ParsedStmt
 parseIfStmt = do
@@ -267,12 +267,12 @@ parseAssignment = do
   _ <- symbol ";"
   return $ AssignmentStmt target expr
 
-parseSAssignmentStmt :: Parser (SimpleStmt ())
+parseSAssignmentStmt :: Parser ParsedStmt
 parseSAssignmentStmt = do
   target <- parseLValue
   _ <- symbol "="
   expr <- parseExpr
-  return $ SAssignmentStmt target expr
+  return $ AssignmentStmt target expr
 
 parseLValue :: Parser LValue
 parseLValue = do

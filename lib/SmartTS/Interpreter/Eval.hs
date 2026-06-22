@@ -109,9 +109,43 @@ execStmt (IfStmt cond thenS elseS) = do
         Nothing -> return Nothing
         Just es -> execStmt es
     _ -> interpretBug "if condition was not bool after type check"
-execStmt (ForStmt _ _ _ _) = 
-  interpretBug "ForStmt should have been desugared into While/Sequence during type check"
-execStmt (WhileStmt cond body) = loop
+execStmt (ForStmt sinit cond updt body) = do
+  -- Execute initializer
+  case init of
+    AssignmentStmt lv e -> do
+      v <- evalExpr e
+      assignLValue lv v
+    VarDeclStmt n _ e -> do
+      v <- evalExpr e
+      modify $ \rt -> rt {rtLocals = M.insert n (Binding True v) (rtLocals rt)}
+    ValDeclStmt n _ e -> do
+      v <- evalExpr e
+      modify $ \rt -> rt {rtLocals = M.insert n (Binding False v) (rtLocals rt)}
+  -- Loop
+  let loop = do
+        c <- evalExpr cond
+        case c of
+          CBool _ False -> return Nothing
+          CBool _ True  -> do
+            ret <- execStmt body
+            case ret of
+              Just v  -> return (Just v)
+              Nothing -> do
+                -- execute update
+                case updt of
+                  AssignmentStmt lv e -> do
+                    v <- evalExpr e
+                    assignLValue lv v
+                  VarDeclStmt n _ e -> do
+                    v <- evalExpr e
+                    modify $ \rt -> rt {rtLocals = M.insert n (Binding True v) (rtLocals rt)}
+                  ValDeclStmt n _ e -> do
+                    v <- evalExpr e
+                    modify $ \rt -> rt {rtLocals = M.insert n (Binding False v) (rtLocals rt)}
+                loop
+          _ -> interpretBug "for condition was not bool after type check"
+  loop
+  execStmt (WhileStmt cond body) = loop
   where
     loop = do
       c <- evalExpr cond

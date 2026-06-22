@@ -440,7 +440,7 @@ statementTests = testGroup "Statement Parsing"
           Contract _ _
             [ MethodDecl _ "f" [] TInt
                 (SequenceStmt
-                  [ ForStmt (SVarDeclStmt "i" TInt (CInt _ 0)) (Lt _ (Var _ "i") (CInt _ 1)) (SAssignmentStmt (LVar "i") (Add _ (Var _ "i") (CInt _ 1))) (SequenceStmt [AssignmentStmt (LVar "x") (Add _ (Var _ "x") (CInt _ 1))])
+                  [ ForStmt (VarDeclStmt "i" TInt (CInt _ 0)) (Lt _ (Var _ "i") (CInt _ 1)) (AssignmentStmt (LVar "i") (Add _ (Var _ "i") (CInt _ 1))) (SequenceStmt [AssignmentStmt (LVar "x") (Add _ (Var _ "x") (CInt _ 1))])
                   , ReturnStmt (Var _ "x")
                   ])
             ] ->

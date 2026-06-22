@@ -107,32 +107,6 @@ checkMethod c m =
           , methodBody       = typedBody
           }
 
-checkSimpleStmt :: SimpleStmt () -> TcM (SimpleStmt Type)
-checkSimpleStmt (SAssignmentStmt lv e) = do
-  checkAssignable lv
-  tl <- typeOfLValue lv
-  te <- inferExpr e
-  lift $ expectType "assignment" (exprAnn te) tl
-  return (SAssignmentStmt lv te)
-checkSimpleStmt (SVarDeclStmt n typ e) = do
-  noDuplicateLocal n
-  te <- inferExpr e
-  lift $ expectType ("initializer of var `" ++ n ++ "`") (exprAnn te) typ
-  modify $ insertLocal n LocalMutable typ
-  return (SVarDeclStmt n typ te)
-checkSimpleStmt (SValDeclStmt n typ e) = do
-  noDuplicateLocal n
-  te <- inferExpr e
-  lift $ expectType ("initializer of val `" ++ n ++ "`") (exprAnn te) typ
-  modify $ insertLocal n LocalImmutable typ
-  return (SValDeclStmt n typ te)
-
--- converte simpleStmt em Stmt
-simpleToStmt :: SimpleStmt Type -> Stmt Type
-simpleToStmt (SAssignmentStmt lv e) = AssignmentStmt lv e
-simpleToStmt (SVarDeclStmt n typ e) = VarDeclStmt n typ e
-simpleToStmt (SValDeclStmt n typ e) = ValDeclStmt n typ e
-
 -- | Check a statement and return the type-annotated version.
 checkStmt :: Stmt () -> TcM (Stmt Type)
 checkStmt (SequenceStmt ss) = SequenceStmt <$> mapM checkStmt ss
@@ -167,19 +141,16 @@ checkStmt (IfStmt cond thn mel) = do
     Nothing  -> return Nothing
     Just els -> Just <$> withSavedEnv (checkStmt els)
   return (IfStmt tc tthn tmel)
-checkStmt (ForStmt sinit cond updt body) = do
+checkStmt (ForStmt init cond updt body) = do
   saved <- get -- salva proprio escopo forloop
-  tinit <- checkSimpleStmt sinit
+  tinit <- checkStmt init
   tc <- inferExpr cond
   lift $ expectType "for loop condition" (exprAnn tc) TBool
   tincr <- checkSimpleStmt updt
   tbody <- checkStmt body
   put saved -- restaura escopo antes do forloop
   -- Executa o forloop como while: sinit; while cond { body; updt }
-  return $ SequenceStmt 
-    [ simpleToStmt tinit
-    , WhileStmt tc (SequenceStmt [tbody, simpleToStmt tincr])
-    ]
+  return (ForStmt tinit tc tincr tbody)
 checkStmt (WhileStmt cond body) = do
   tc <- inferExpr cond
   lift $ expectType "while condition" (exprAnn tc) TBool
