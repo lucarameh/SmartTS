@@ -30,6 +30,7 @@ data Type = TInt
           | TBool
           | TUnit
           | TRecord [(Name, Type)]
+          | TOption Type -- Representa o tipo polimórfico option<T>
   deriving (Eq, Show)
 
 type Name = String
@@ -57,6 +58,8 @@ data Expr a
   | Record  a [(Name, Expr a)]
   | Unit    a
   | Call    a Name [Expr a]
+  | CNone   a Type              -- O valor 'None'. Ele carrega o 'Type' para saber do que ele é vazio.
+  | CSome   a (Expr a)          -- O valor 'Some(valor)'. Ele carrega a expressão que está dentro dele.
   deriving (Eq, Show)
 
 -- | Extract the annotation from any expression node.
@@ -83,6 +86,8 @@ exprAnn (Gte a _ _)         = a
 exprAnn (Record a _)        = a
 exprAnn (Unit a)            = a
 exprAnn (Call a _ _)        = a
+exprAnn (CNone a _)         = a   -- Extrai a anotação do nó None
+exprAnn (CSome a _)         = a   -- Extrai a anotação do nó Some
 
 type MethodBody a = Stmt a
 
@@ -103,6 +108,7 @@ data Stmt a
   | WhileStmt (Expr a) (Stmt a)                 -- (condition, body)
   | ReturnStmt (Expr a)
   | SequenceStmt [Stmt a]
+  | MatchOptionStmt (Expr a) Name (Stmt a) (Stmt a) -- Instrução match_option (condição, variável_local, bloco_some, bloco_none)
   deriving (Eq, Show)
 
 -- | Type aliases for the two phases of the compilation pipeline.

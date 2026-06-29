@@ -39,6 +39,10 @@ reservedWords =
   , "val"
   , "true"
   , "false"
+  , "option"
+  , "Some"
+  , "None"
+  , "match_option"
   ]
 
 identifier :: Parser String
@@ -55,7 +59,7 @@ reserved = symbol
 
 -- Types
 parseType :: Parser Type
-parseType = parseRecordType <|> parsePrimitiveType
+parseType = parseRecordType <|> parseOptionType <|>  parsePrimitiveType
   where
     parsePrimitiveType :: Parser Type
     parsePrimitiveType =
@@ -74,6 +78,15 @@ parseType = parseRecordType <|> parsePrimitiveType
       _ <- symbol ":"
       typ <- parseType
       return (name, typ)
+
+    -- Nova regra para tipos option<T>
+    parseOptionType :: Parser Type
+    parseOptionType = do
+      _ <- reserved "option"
+      _ <- symbol "<"
+      t <- parseType
+      _ <- symbol ">"
+      return $ TOption t
 
 -- Names
 parseName :: Parser Name
@@ -121,6 +134,8 @@ parseAtom =
     <|> parseRecordExpr
     <|> parseBool
     <|> parseInt
+    <|> parseSome
+    <|> parseNone
     <|> parseVarOrCall
     <|> parens parseExpr
 
@@ -150,6 +165,23 @@ parseRecordExpr = do
   fields <- braces $ sepBy parseRecordField (symbol ",")
   return $ Record () fields
 
+-- [Novas funções para parseAtom]
+-- Parse de Some(expr)
+parseSome :: Parser ParsedExpr
+parseSome = do
+  _ <- reserved "Some"
+  expr <- parens parseExpr
+  return $ CSome () expr
+
+-- Parse de None<T>
+parseNone :: Parser ParsedExpr
+parseNone = do
+  _ <- reserved "None"
+  _ <- symbol "<"
+  t <- parseType
+  _ <- symbol ">"
+  return $ CNone () t
+
 parseRecordField :: Parser (Name, ParsedExpr)
 parseRecordField = do
   name <- parseName
@@ -174,6 +206,7 @@ parseStmt =
   parseIfStmt
     <|> parseForStmt
     <|> parseWhileStmt
+    <|> parseMatchOptionStmt
     <|> parseVarDeclStmt
     <|> parseValDeclStmt
     <|> parseReturn
@@ -258,6 +291,24 @@ parseWhileStmt = do
   cond <- parens parseExpr
   body <- parseStmt
   return $ WhileStmt cond body
+
+-- Implementação do MatchOptionStmt
+parseMatchOptionStmt :: Parser ParsedStmt
+parseMatchOptionStmt = do
+  _ <- reserved "match_option"
+  cond <- parens parseExpr
+  -- Sintaxe sugerida: match_option(expr) { Some(var) => { ... }, None => { ... } }
+  _ <- symbol "{"
+  _ <- reserved "Some"
+  someVar <- parens parseName
+  _ <- symbol "=>"
+  someBranch <- parseBlock
+  _ <- symbol ","
+  _ <- reserved "None"
+  _ <- symbol "=>"
+  noneBranch <- parseBlock
+  _ <- symbol "}"
+  return $ MatchOptionStmt cond someVar someBranch noneBranch
 
 parseAssignment :: Parser ParsedStmt
 parseAssignment = do
