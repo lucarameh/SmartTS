@@ -129,19 +129,21 @@ execStmt (MatchOptionStmt cond someVar someBranch noneBranch) = do
       return ret
     CNone _ _ -> execStmt noneBranch
     _ -> interpretBug "match_option condition was not option after type check"
+
 execStmt (ForStmt sinit cond updt body) = do
-  -- Execute initializer
-  case init of
+  -- Executa inicializador
+  case sinit of
     AssignmentStmt lv e -> do
-      v <- evalExpr e
-      assignLValue lv v
+      _ <- assignLValue lv =<< evalExpr e
+      return ()
     VarDeclStmt n _ e -> do
       v <- evalExpr e
       modify $ \rt -> rt {rtLocals = M.insert n (Binding True v) (rtLocals rt)}
     ValDeclStmt n _ e -> do
       v <- evalExpr e
       modify $ \rt -> rt {rtLocals = M.insert n (Binding False v) (rtLocals rt)}
-  -- Loop
+    _ -> return () -- Caso genérico para outros stmts
+  
   let loop = do
         c <- evalExpr cond
         case c of
@@ -151,21 +153,12 @@ execStmt (ForStmt sinit cond updt body) = do
             case ret of
               Just v  -> return (Just v)
               Nothing -> do
-                -- execute update
-                case updt of
-                  AssignmentStmt lv e -> do
-                    v <- evalExpr e
-                    assignLValue lv v
-                  VarDeclStmt n _ e -> do
-                    v <- evalExpr e
-                    modify $ \rt -> rt {rtLocals = M.insert n (Binding True v) (rtLocals rt)}
-                  ValDeclStmt n _ e -> do
-                    v <- evalExpr e
-                    modify $ \rt -> rt {rtLocals = M.insert n (Binding False v) (rtLocals rt)}
+                _ <- execStmt updt -- Executa o update (já sabemos que execStmt lida com ele)
                 loop
-          _ -> interpretBug "for condition was not bool after type check"
+          _ -> interpretBug "for condition was not bool"
   loop
-  execStmt (WhileStmt cond body) = loop
+
+execStmt (WhileStmt cond body) = loop
   where
     loop = do
       c <- evalExpr cond
@@ -176,7 +169,7 @@ execStmt (ForStmt sinit cond updt body) = do
           case ret of
             Just v  -> return (Just v)
             Nothing -> loop
-        _ -> interpretBug "while condition was not bool after type check"
+        _ -> interpretBug "while condition was not bool"
 
 execSequence :: [TypedStmt] -> EvalM (Maybe TypedExpr)
 execSequence [] = return Nothing

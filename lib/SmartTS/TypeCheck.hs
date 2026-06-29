@@ -143,14 +143,13 @@ checkStmt (IfStmt cond thn mel) = do
   return (IfStmt tc tthn tmel)
 
 
--- <<< CORRIGIDO: ForStmt reescrito para usar withSavedEnv e checkStmt padrão
 checkStmt (ForStmt initStmt cond updt body) = do
   withSavedEnv $ do
     tinit <- checkStmt initStmt
     tc <- inferExpr cond
     lift $ expectType "for loop condition" (exprAnn tc) TBool
-    tincr <- checkStmt updt
-    tbody <- checkStmt body
+    tbody <- withSavedEnv (checkStmt body)
+    tincr <- withSavedEnv (checkStmt updt) 
     return (ForStmt tinit tc tincr tbody)
 
 

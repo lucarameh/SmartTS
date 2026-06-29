@@ -11,6 +11,8 @@ import SmartTS.Interpreter.Runtime
 exprToJson :: Expr a -> Value
 exprToJson (CInt _ n) = Number (fromIntegral n)
 exprToJson (CBool _ b) = Bool b
+exprToJson (CSome _ e) = exprToJson e
+exprToJson (CNone _ _) = Null
 exprToJson (Record _ fields) =
   Object $
     KM.fromList
@@ -26,6 +28,11 @@ jsonToExprByType TInt (Number n) =
     Right i -> Right (CInt TInt i)
     Left _  -> Left "Expected integer number for int type."
 jsonToExprByType TBool (Bool b) = Right (CBool TBool b)
+jsonToExprByType (TOption innerType) Null = 
+  Right (CNone (TOption innerType) innerType)
+jsonToExprByType (TOption innerType) val = do
+  e <- jsonToExprByType innerType val
+  Right (CSome (TOption innerType) e)
 jsonToExprByType (TRecord fieldsT) (Object obj) = do
   pairs <- mapM (decodeField obj) fieldsT
   Right (Record (TRecord fieldsT) pairs)
