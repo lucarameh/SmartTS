@@ -343,6 +343,17 @@ statementTests = testGroup "Statement Parsing"
             return ()
           _ -> assertFailure $ "Expected while statement, got: " ++ show contract
 
+  , testCase "Match option statement" $
+        parseSuccess "contract Test { storage: { x: int }; @entrypoint f(): int { val x: option<int> = None<int>; match_option(x) { Some(v) => { return v; }, None => { return 0; } } } }" $ \contract ->
+          case contract of
+            Contract _ _ [MethodDecl _ "f" [] TInt (SequenceStmt 
+              [ ValDeclStmt "x" (TOption TInt) (CNone () TInt)
+              , MatchOptionStmt (Var () "x") "v" 
+                  (SequenceStmt [ReturnStmt (Var () "v")]) 
+                  (SequenceStmt [ReturnStmt (CInt () 0)])
+              ])] -> return ()
+            _ -> assertFailure $ "Unexpected structure: " ++ show contract
+
   , testCase "Field assignment statement (x.a = ...)" $
       parseSuccess "contract Test { storage: { x: { a: int } }; @entrypoint fa(): int { x.a = 3; return x.a; } }" $ \contract ->
         case contract of
@@ -482,6 +493,12 @@ typeCheckTests =
     , testCase "Shadowing loop init fails" $
         typeCheckFailure
           "contract C { storage: { x: int }; @originate init(): int { storage.x = 0; return 0; } @entrypoint shadow(): int { var y: int = 10; for (var y: int = 0; y < 1; y = y + 1) { storage.x = storage.x + 1; } return y; } }"
+    , testCase "Match option on option type is well-typed" $
+        typeCheckSuccess
+          "contract C { storage: { x: int }; @originate init(): int { val o: option<int> = Some(1); match_option(o) { Some(v) => { return v; }, None => { return 0; } } } }"
+    , testCase "Match option on non-option type fails" $
+        typeCheckFailure
+          "contract C { storage: { x: int }; @originate init(): int { val n: int = 1; match_option(n) { Some(v) => { return v; }, None => { return 0; } } } }"
     , testCase "Storage field assignment matches storage type" $
         typeCheckSuccess
           "contract C { storage: { n: int }; @originate init(): unit { storage.n = 3; return (); } }"
