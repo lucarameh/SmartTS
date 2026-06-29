@@ -26,8 +26,8 @@ translateExpression (A.Not ty e)     = translateUnaryExpression e ty L.PrimNot
 translateExpression (A.CSome ty e) = 
     mkExpr (L.Prim L.PrimSome [translateExpression e]) ty
 
-translateExpression (A.CNone ty) = 
-    mkExpr (L.Prim L.PrimNone []) ty
+translateExpression (A.CNone _ ty) = 
+    mkExpr (L.Prim (L.PrimNone (translateType ty)) []) ty
 -- | Translate a SmartTS block (a list of statements) into a nested LLTZ let-expression.
 --
 -- LLTZ is an expression-based language derived from the Lambda calculus.
@@ -73,6 +73,22 @@ translateStatement (A.IfStmt cond s1 Nothing) =
   let cond' = translateExpression cond
       s1'   = translateStatement s1
   in L.Expr (L.IfBool cond' s1' (L.Expr L.Skip L.TUnit)) (L.exprType s1')
+
+translateStatement (A.ForStmt sinit cond inc block) =
+  let -- 1. Traduzimos o init. Assumindo que a AST ForStmt inicia com uma Declaração:
+      -- Precisamos extrair o nome da variável mutável.
+      mutVar = case sinit of
+                 A.VarDeclStmt name _ _ -> L.MutVar name
+                 _ -> error "For loop precisa iniciar com uma variável mutável (VarDeclStmt)"
+      
+      init'   = translateStatement sinit
+      cond'   = translateExpression cond
+      inc'    = translateStatement inc
+      block'  = translateStatement block
+  in 
+      -- O LLTZ For espera: MutVar Expr Expr Expr Expr
+      L.Expr (L.For mutVar init' cond' inc' block') L.TUnit
+{-
 --falta definir a MutVar
 translateStatement (A.ForStmt init cond inc block) =
   let init' = translateStatement init
@@ -84,6 +100,8 @@ translateStatement (A.ForStmt init cond inc block) =
 -- The result type is TUnit because Michelson's LOOP instruction does not produce
 -- a value: when the loop exits the stack is in the same state as before the
 -- condition was first evaluated, so no value escapes the loop.
+-}
+
 translateStatement (A.WhileStmt cond block) =
   let cond'  = translateExpression cond
       block' = translateStatement block
