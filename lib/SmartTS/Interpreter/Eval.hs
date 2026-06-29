@@ -45,6 +45,10 @@ evalExpr (Not _ e) = do
   case v of
     CBool _ b -> return (CBool TBool (not b))
     _         -> interpretBug "operand of ! was not bool after type check"
+evalExpr (CSome ty e) = do
+  v <- evalExpr e
+  return (CSome ty v)
+evalExpr e@(CNone _ _) = return e
 evalExpr (And _ a b) = boolBin a b (&&)
 evalExpr (Or  _ a b) = boolBin a b (||)
 evalExpr (Add _ a b) = intBin a b (+)
@@ -109,6 +113,22 @@ execStmt (IfStmt cond thenS elseS) = do
         Nothing -> return Nothing
         Just es -> execStmt es
     _ -> interpretBug "if condition was not bool after type check"
+execStmt (MatchOptionStmt cond someVar someBranch noneBranch) = do
+  c <- evalExpr cond
+  case c of
+    CSome _ v -> do
+      -- Salva o ambiente atual
+      rt <- get
+      let oldLocals = rtLocals rt
+      -- Adiciona a variável do 'Some(var)' no ambiente local como imutável
+      modify $ \r -> r { rtLocals = M.insert someVar (Binding False v) (rtLocals r) }
+      -- Executa o bloco do Some
+      ret <- execStmt someBranch
+      -- Restaura o ambiente antigo (para a variável não vazar do escopo)
+      modify $ \r -> r { rtLocals = oldLocals }
+      return ret
+    CNone _ _ -> execStmt noneBranch
+    _ -> interpretBug "match_option condition was not option after type check"
 execStmt (ForStmt sinit cond updt body) = do
   -- Execute initializer
   case init of

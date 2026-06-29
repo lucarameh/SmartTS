@@ -23,7 +23,11 @@ translateExpression (A.And ty e1 e2) = translateBinaryExpression e1 e2 ty L.Prim
 translateExpression (A.Or  ty e1 e2) = translateBinaryExpression e1 e2 ty L.PrimOr
 translateExpression (A.Not ty e)     = translateUnaryExpression e ty L.PrimNot
 -- TODO: Write here the translation of the remaining expressions.
+translateExpression (A.CSome ty e) = 
+    mkExpr (L.Prim L.PrimSome [translateExpression e]) ty
 
+translateExpression (A.CNone ty) = 
+    mkExpr (L.Prim L.PrimNone []) ty
 -- | Translate a SmartTS block (a list of statements) into a nested LLTZ let-expression.
 --
 -- LLTZ is an expression-based language derived from the Lambda calculus.
@@ -89,6 +93,22 @@ translateStatement (A.WhileStmt cond block) =
 translateStatement (A.ReturnStmt expr) = translateExpression expr
 -- Translate a nested block of statements.
 translateStatement (A.SequenceStmt stmts) = translateBlock stmts
+
+
+translateStatement (A.MatchOptionStmt cond someVar someBranch noneBranch) =
+  let cond' = translateExpression cond
+      none' = translateStatement noneBranch
+      some' = translateStatement someBranch
+      
+      -- Extraímos o tipo T de dentro do TOption
+      innerType = case L.exprType cond' of
+                    L.TOption t -> t
+                    _           -> error "Tipo não é option"
+      
+      -- Criamos o Binder usando o tipo extraído
+      someBinder = L.LambdaBinder (L.Var someVar, innerType) some'
+  in 
+      L.Expr (L.IfNone cond' none' someBinder) (L.exprType some')
 
 -- Auxiliary functions for translating expressions.
 

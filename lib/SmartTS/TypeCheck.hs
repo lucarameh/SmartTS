@@ -141,21 +141,45 @@ checkStmt (IfStmt cond thn mel) = do
     Nothing  -> return Nothing
     Just els -> Just <$> withSavedEnv (checkStmt els)
   return (IfStmt tc tthn tmel)
-checkStmt (ForStmt init cond updt body) = do
-  saved <- get -- salva proprio escopo forloop
-  tinit <- checkStmt init
-  tc <- inferExpr cond
-  lift $ expectType "for loop condition" (exprAnn tc) TBool
-  tincr <- checkSimpleStmt updt
-  tbody <- checkStmt body
-  put saved -- restaura escopo antes do forloop
-  -- Executa o forloop como while: sinit; while cond { body; updt }
-  return (ForStmt tinit tc tincr tbody)
+
+
+-- <<< CORRIGIDO: ForStmt reescrito para usar withSavedEnv e checkStmt padrão
+checkStmt (ForStmt initStmt cond updt body) = do
+  withSavedEnv $ do
+    tinit <- checkStmt initStmt
+    tc <- inferExpr cond
+    lift $ expectType "for loop condition" (exprAnn tc) TBool
+    tincr <- checkStmt updt
+    tbody <- checkStmt body
+    return (ForStmt tinit tc tincr tbody)
+
+
 checkStmt (WhileStmt cond body) = do
   tc <- inferExpr cond
   lift $ expectType "while condition" (exprAnn tc) TBool
   tbody <- withSavedEnv (checkStmt body)
   return (WhileStmt tc tbody)
+
+-- Início da checagem do match_option
+checkStmt (MatchOptionStmt cond someVar someBranch noneBranch) = do
+  tcond <- inferExpr cond
+  
+  -- 1. Garante que a expressão sendo testada seja um tipo Option e extrai o tipo interno (innerType)
+  innerType <- case exprAnn tcond of
+    TOption t -> return t
+    got       -> tcError $ "match_option condition has wrong type: expected option<T>, inferred " ++ prettyType got ++ "."
+
+  -- 2. Avalia o bloco do 'Some' isolando o escopo
+  tsomeBranch <- withSavedEnv $ do
+    noDuplicateLocal someVar -- Evita que a variável temporária sobreponha alguma variável local existente no mesmo bloco
+    modify $ insertLocal someVar LocalImmutable innerType -- Injeta a variável no ambiente com o tipo extraído
+    checkStmt someBranch
+  
+  -- 3. Avalia o bloco do 'None' também isolando o escopo (braços de match não vazam ambiente)
+  tnoneBranch <- withSavedEnv (checkStmt noneBranch)
+
+  return (MatchOptionStmt tcond someVar tsomeBranch tnoneBranch)
+-- Fim da checagem do match_option
 
 noDuplicateLocal :: Name -> TcM ()
 noDuplicateLocal n = do
@@ -266,6 +290,18 @@ inferExpr (Call () name args) = do
         expected
       return (Call (returnType sig) name targs)
 
+-- Início das regras de inferência para None e Some
+inferExpr (CNone () t) =
+  -- Um nó None carrega seu próprio tipo-base na AST, nós só precisamos confirmar que ele constrói um TOption.
+  return (CNone (TOption t) t)
+
+inferExpr (CSome () e) = do
+  -- Um nó Some possui uma expressão interna. Precisamos inferir o tipo dessa expressão primeiro.
+  te <- inferExpr e
+  -- O tipo do Some será um TOption parametrizado pelo tipo da expressão interna (exprAnn te).
+  return (CSome (TOption (exprAnn te)) te)
+-- Fim das regras de inferência para None e Some
+
 inferBoolBin :: (Expr Type -> Expr Type -> Expr Type) -> Expr () -> Expr () -> TcM (Expr Type)
 inferBoolBin con a b = do
   ta <- inferExpr a
@@ -316,6 +352,7 @@ typesEqual :: Type -> Type -> Bool
 typesEqual TInt  TInt  = True
 typesEqual TBool TBool = True
 typesEqual TUnit TUnit = True
+typesEqual (TOption t1) (TOption t2) = typesEqual t1 t2 -- Regra para comparar options
 typesEqual (TRecord as) (TRecord bs) = length as == length bs && and (zipWith fieldEq as bs)
   where
     fieldEq (n1, t1) (n2, t2) = n1 == n2 && typesEqual t1 t2
@@ -325,6 +362,7 @@ prettyType :: Type -> String
 prettyType TInt  = "int"
 prettyType TBool = "bool"
 prettyType TUnit = "unit"
+prettyType (TOption t) = "option<" ++ prettyType t ++ ">" -- Previne crash do GHC ao formatar erros
 prettyType (TRecord fs) =
   "{"
     ++ concat
