@@ -74,14 +74,14 @@ translateStatement (A.IfStmt cond s1 Nothing) =
       s1'   = translateStatement s1
   in L.Expr (L.IfBool cond' s1' (L.Expr L.Skip L.TUnit)) (L.exprType s1')
 
-translateStatement (A.ForStmt sinit cond inc block) =
+translateStatement (A.ForStmt init cond inc block) =
   let -- 1. Traduzimos o init. Assumindo que a AST ForStmt inicia com uma Declaração:
       -- Precisamos extrair o nome da variável mutável.
-      mutVar = case sinit of
+      mutVar = case init of
                  A.VarDeclStmt name _ _ -> L.MutVar name
                  _ -> error "For loop precisa iniciar com uma variável mutável (VarDeclStmt)"
       
-      init'   = translateStatement sinit
+      init'   = translateStatement init
       cond'   = translateExpression cond
       inc'    = translateStatement inc
       block'  = translateStatement block

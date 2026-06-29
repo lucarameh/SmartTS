@@ -275,7 +275,7 @@ parseForStmt :: Parser (Stmt ())
 parseForStmt = do
   _ <- reserved "for"
   _ <- symbol "("
-  initial <- parseSimpleStmt
+  initial <- parseSVarDeclStmt
   _ <- symbol ";"
   cond <- parseExpr
   _ <- symbol ";"

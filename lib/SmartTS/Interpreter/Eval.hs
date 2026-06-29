@@ -130,18 +130,12 @@ execStmt (MatchOptionStmt cond someVar someBranch noneBranch) = do
     CNone _ _ -> execStmt noneBranch
     _ -> interpretBug "match_option condition was not option after type check"
 
-execStmt (ForStmt sinit cond updt body) = do
+execStmt (ForStmt init cond updt body) = do
   -- Executa inicializador
-  case sinit of
-    AssignmentStmt lv e -> do
-      _ <- assignLValue lv =<< evalExpr e
-      return ()
+  case init of
     VarDeclStmt n _ e -> do
       v <- evalExpr e
       modify $ \rt -> rt {rtLocals = M.insert n (Binding True v) (rtLocals rt)}
-    ValDeclStmt n _ e -> do
-      v <- evalExpr e
-      modify $ \rt -> rt {rtLocals = M.insert n (Binding False v) (rtLocals rt)}
     _ -> return () -- Caso genérico para outros stmts
   
   let loop = do
