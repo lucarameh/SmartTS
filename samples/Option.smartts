@@ -1,0 +1,23 @@
+contract TesteOption {
+    storage: { valor: int };
+
+    @originate
+    init(): unit {
+        storage.valor = 0;
+        return ();
+    }
+
+    @entrypoint
+    processar(input: option<int>): int {
+        match_option (input) {
+            Some(x) => {
+                storage.valor = x;
+                return storage.valor;
+            },
+            None => {
+                storage.valor = 1;
+                return storage.valor;
+            }
+        }
+    }
+}
